@@ -22,7 +22,7 @@ import (
 
 type Publish struct {
 	Id         int64
-	Name       string    `xorm:varchar not null`
+	AppName    string    `xorm:varchar not null`
 	FileName   string    `xorm:varchar not null`
 	GatewayUrl string    `xorm:varchar not null`
 	CreatedAt  time.Time `xorm:created`
@@ -80,10 +80,10 @@ func main() {
 	})
 
 	publishApi.Post("/", func(ctx iris.Context) {
-		appName := ctx.PostValue("app-name")
+		appName := ctx.PostValue("appName")
 
 		publishAdd := &Publish{
-			Name:       appName,
+			AppName:    appName,
 			FileName:   "",
 			GatewayUrl: "",
 			CreatedAt:  time.Now(),
@@ -93,8 +93,8 @@ func main() {
 		// Remove previous uploads.
 		// TODO: need to keep for a while in random file name.
 		// FIXME: cannot remove files and directories why?
-		out, err := exec.Command("rm", "-rf", "uploads/*").Output()
-		fmt.Printf("RM command %s", out)
+		err := exec.Command("rm", "-rf", "uploads/*").Run()
+		// fmt.Printf("RM command %s", out)
 
 		// Upload a file.
 		_, err = ctx.UploadFormFiles("./uploads", beforeSave)
@@ -105,7 +105,7 @@ func main() {
 
 		// TODO: auto detect a directory name.
 		// Unzip.
-		out, err = exec.Command("unzip", "uploads/upload.zip", "-d", "uploads/").Output()
+		out, err := exec.Command("unzip", "uploads/upload.zip", "-d", "uploads/").Output()
 		fmt.Printf("Unzip %s", out)
 
 		// IPFS run.
@@ -146,9 +146,9 @@ func main() {
 
 	publishApi.Patch("/{id:int}", func(ctx iris.Context) {
 		result, _ := ctx.Params().GetInt64("id")
-		appName := ctx.PostValue("app-name")
+		appName := ctx.PostValue("appName")
 		condition := Publish{Id: result}
-		data := &Publish{Name: appName}
+		data := &Publish{AppName: appName}
 		orm.Update(data, condition)
 		ctx.UploadFormFiles("./uploads", beforeSave)
 		ctx.Writef("Patch!! %#v, %#v", result, appName)

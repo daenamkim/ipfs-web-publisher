@@ -8,35 +8,35 @@ export default new Vuex.Store({
   state: {
     publishSelected: {},
     publishList: [],
-    view: 'login'
+    view: "123"
   },
   mutations: {
-    updatePublishList() {
+    updatePublishList () {
       // TODO: 
     },
-    switchView(state, view) {
+    switchView (state, view) {
       state.view = view;
     }
   },
   actions: {
-    addPublish({ commit }, id) {
-      const param = id !== undefined ? id : '';
+    addPublish ({ commit }, id) {
+      const param = id !== undefined ? id : "";
       // TODO: 
       axios.get(`http://localhost:8081/publish/${param}`)
         .then(response => {
           console.log(response);
-          commit('updatePublishList', response);
+          commit("updatePublishList", response);
         })
         .catch()
     },
-    updatePublish() {
+    updatePublish () {
       // TODO: 
     },
-    getPublish() {
+    getPublish () {
       // TODO: 
     },
-    switchView({ commit }, view) {
-      commit('switchView', view)
+    switchView ({ commit }, view) {
+      commit("switchView", view)
     }
   }
 });

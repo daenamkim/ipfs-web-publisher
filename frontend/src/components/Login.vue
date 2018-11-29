@@ -24,6 +24,10 @@ export default {
 </script>
 
 <style socped>
+.login {
+  text-align: center;
+}
+
 .title {
   margin-top: 20px;
   margin-bottom: 20px;

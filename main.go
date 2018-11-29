@@ -50,6 +50,9 @@ func main() {
 	publishApi.Get("/", func(ctx iris.Context) {
 		// TODO: how to get list.
 	})
+	publishApi.Options("/", func(ctx iris.Context) {
+		// for CORS
+	})
 	publishApi.Get("/{id:int}", func(ctx iris.Context) {
 		id, err := ctx.Params().GetInt64("id")
 		if err != nil {

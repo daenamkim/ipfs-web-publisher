@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"mime/multipart"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 	_ "github.com/lib/pq"
 
+	"github.com/iris-contrib/middleware/cors"
 	"github.com/kataras/iris"
 	"github.com/kataras/iris/middleware/logger"
 	"github.com/kataras/iris/middleware/recover"
@@ -29,6 +31,8 @@ func IPFSWebPublisher() *iris.Application {
 	app := iris.New()
 	app.Use(recover.New())
 	app.Use(logger.New())
+	app.Use(cors.Default())
+
 	app.Logger().SetLevel("debug")
 
 	return app
@@ -140,7 +144,12 @@ func main() {
 	app.StaticWeb("/", "./public")
 	app.StaticWeb("/js", "./public/js")
 	app.StaticWeb("/css", "./public/css")
-	app.Run(iris.Addr(":8080"))
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8081"
+	}
+	app.Run(iris.Addr(":" + port))
 }
 
 func beforeSave(ctx iris.Context, file *multipart.FileHeader) {

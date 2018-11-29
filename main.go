@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"mime/multipart"
 	"os"
-	"strconv"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -21,7 +23,7 @@ import (
 type Publish struct {
 	Id         int64
 	Name       string    `xorm:varchar not null`
-	LocalUrl   string    `xorm:varchar not null`
+	FileName   string    `xorm:varchar not null`
 	GatewayUrl string    `xorm:varchar not null`
 	CreatedAt  time.Time `xorm:created`
 	UpdatedAt  time.Time `xorm:updated`
@@ -43,7 +45,8 @@ func main() {
 
 	orm, err := setupDatabase()
 	if err != nil {
-		app.Logger().Fatalf("orm failed to initialized publish table: %v", err)
+		// app.Logger().Fatalf("orm failed to initialized publish table: %v", err)
+		log.Fatal(err)
 	}
 
 	publishApi := app.Party("/publish")
@@ -56,20 +59,20 @@ func main() {
 	publishApi.Get("/{id:int}", func(ctx iris.Context) {
 		id, err := ctx.Params().GetInt64("id")
 		if err != nil {
-			ctx.Writef("ID error.")
+			log.Fatal(err)
 			return
 		}
 
 		publish := Publish{Id: id}
 		_, err = orm.Get(&publish)
 		if err != nil {
-			ctx.Writef("DB error.")
+			log.Fatal(err)
 			return
 		}
 
 		publishJson, err := json.Marshal(publish)
 		if err != nil {
-			ctx.Writef("JSON parse error.")
+			log.Fatal(err)
 			return
 		}
 
@@ -81,35 +84,60 @@ func main() {
 
 		publishAdd := &Publish{
 			Name:       appName,
-			LocalUrl:   "",
+			FileName:   "",
 			GatewayUrl: "",
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		}
 
-		// TODO: how to get latest one after insert.
-		_, err := orm.Insert(publishAdd)
+		// Remove previous uploads.
+		// TODO: need to keep for a while in random file name.
+		// FIXME: cannot remove files and directories why?
+		out, err := exec.Command("rm", "-rf", "uploads/*").Output()
+		fmt.Printf("RM command %s", out)
+
+		// Upload a file.
+		_, err = ctx.UploadFormFiles("./uploads", beforeSave)
 		if err != nil {
-			ctx.Writef("DB error.")
+			log.Fatal(err)
 			return
 		}
 
-		_, err = ctx.UploadFormFiles("./uploads", beforeSave)
+		// TODO: auto detect a directory name.
+		// Unzip.
+		out, err = exec.Command("unzip", "uploads/upload.zip", "-d", "uploads/").Output()
+		fmt.Printf("Unzip %s", out)
+
+		// IPFS run.
+		out, err = exec.Command("ipfs", "add", "-r", "uploads/upload").Output()
+		lines := strings.Split(string(out), "\n")
+		// for index, line := range lines {
+		// 	fmt.Printf("%d, %q\n", index, line)
+		// }
+		// "added QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH sample/img/test.png"
+		// "added QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH sample/index.html"
+		// "added QmWami7sJTPgZCzZKU8T6N13XQoMaktE5jKRAmVLWPqj4w sample/img"
+		// "added QmdUnBjZgps3brQgWSXHs9wLbicJwXaqhRJEVgtGjKFDqE sample"
+		// ""
+		publishAdd.GatewayUrl = strings.Split(lines[len(lines)-2], " ")[1]
+
+		// TODO: how to get latest one after insert.
+		_, err = orm.Insert(publishAdd)
 		if err != nil {
-			ctx.Writef("Upload error.")
+			log.Fatal(err)
 			return
 		}
 
 		// publishAdded := Publish{Id: ?}
 		// _, err = orm.Get(&publishAdded)
 		// if err != nil {
-		// 	ctx.Writef("DB error.")
+		// 	log.Fatal(err)
 		// 	return
 		// }
 
 		// publishAddedJson, err := json.Marshal(publishAdded)
 		// if err != nil {
-		// 	ctx.Writef("JSON parse error.")
+		// 	log.Fatal(err)
 		// 	return
 		// }
 
@@ -129,14 +157,15 @@ func main() {
 	publishApi.Delete("/{id:int}", func(ctx iris.Context) {
 		id, err := ctx.Params().GetInt64("id")
 		if err != nil {
-			ctx.Writef("ID error.")
+			log.Fatal(err)
 			return
 		}
 
 		publish := Publish{Id: id}
 		_, err = orm.Delete(publish)
 		if err != nil {
-			ctx.Writef("DB error.")
+			log.Fatal(err)
+			return
 		}
 	})
 
@@ -156,11 +185,13 @@ func main() {
 }
 
 func beforeSave(ctx iris.Context, file *multipart.FileHeader) {
-	ip := ctx.RemoteAddr()
-	ip = strings.Replace(ip, ".", "-", -1)
-	ip = strings.Replace(ip, ":", "-", -1)
-	now := time.Now().Unix()
-	file.Filename = ip + "-" + strconv.FormatInt(now, 10) + "-" + file.Filename
+	// TODO:
+	// ip := ctx.RemoteAddr()
+	// ip = strings.Replace(ip, ".", "-", -1)
+	// ip = strings.Replace(ip, ":", "-", -1)
+	// now := time.Now().Unix()
+	// file.Filename = ip + "-" + strconv.FormatInt(now, 10) + "-" + file.Filename
+	file.Filename = "upload.zip"
 }
 
 func setupDatabase() (*xorm.Engine, error) {
@@ -170,7 +201,7 @@ func setupDatabase() (*xorm.Engine, error) {
 	// connStr := "postgres://pqgotest:password@localhost/pqgotest?sslmode=verify-full"
 	// db, err := sql.Open("postgres", connStr)
 	// if err != nil {
-	// 	log.Fatal(err)
+	//  return
 	// }
 	//
 	// var publishId int
@@ -180,7 +211,7 @@ func setupDatabase() (*xorm.Engine, error) {
 	// db.Query(`UPDATE publish SET local_url = $1, updated_at = $3 WHERE id = $2`, "NEW ONE!!!", 5, time.Now())
 	// rows, err := db.Query("SELECT * FROM publish")
 	// if err != nil {
-	// 	log.Fatal(err)
+	//	return
 	// }
 
 	// ORM initialization for database.
